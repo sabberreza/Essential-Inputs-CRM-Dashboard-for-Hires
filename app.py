@@ -269,7 +269,14 @@ elif page == "Team Members":
         conn.close()
         
         if not team_df.empty:
-            st.dataframe(team_df, use_container_width=True)
+            # Hide commission column for non-authenticated users
+            if st.session_state.get('settings_authenticated', False):
+                st.dataframe(team_df, use_container_width=True)
+            else:
+                # Show team data without commission column
+                display_df = team_df.drop('commission_percentage', axis=1)
+                st.dataframe(display_df, use_container_width=True)
+                st.info("💡 Commission details are only visible to authenticated administrators.")
         else:
             st.info("No team members added yet.")
     
@@ -287,35 +294,39 @@ elif page == "Team Members":
                 email = st.text_input("Email")
                 phone = st.text_input("Phone")
             
-            # Auto-fill commission based on role
-            role_commissions = {
-                "Lead Generator": 8.0,
-                "Closer": 10.0,
-                "Producer": 8.0,
-                "Manager": 0.0
-            }
-            commission_percentage = st.number_input(
-                "Commission %",
-                value=role_commissions.get(role, 0.0),
-                min_value=0.0,
-                max_value=100.0,
-                step=0.5
-            )
+            # Auto-fill commission based on role (only visible to authenticated users)
+            if st.session_state.get('settings_authenticated', False):
+                role_commissions = {
+                    "Lead Generator": 8.0,
+                    "Closer": 10.0,
+                    "Producer": 8.0,
+                    "Manager": 0.0
+                }
+                commission_percentage = st.number_input(
+                    "Commission %",
+                    value=role_commissions.get(role, 0.0),
+                    min_value=0.0,
+                    max_value=100.0,
+                    step=0.5
+                )
+            else:
+                # Default commission for non-authenticated users
+                commission_percentage = 0.0
             
             submitted = st.form_submit_button("Add Team Member")
             
             if submitted and name:
-                conn = sqlite3.connect('crm_database.db')
-                cursor = conn.cursor()
-                cursor.execute("""
+                    conn = sqlite3.connect('crm_database.db')
+                    cursor = conn.cursor()
+                    cursor.execute("""
                     INSERT INTO team_members (name, role, email, phone, commission_percentage)
-                    VALUES (?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?)
                 """, (name, role, email, phone, commission_percentage))
-                conn.commit()
-                conn.close()
-                
+                    conn.commit()
+                    conn.close()
+                    
                 st.success(f"Team member '{name}' added successfully!")
-                st.rerun()
+                    st.rerun()
 
 elif page == "Deals":
     st.title("Deal Management")
@@ -336,16 +347,27 @@ elif page == "Deals":
             st.dataframe(deals_df, use_container_width=True)
             
             # Deal statistics
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
             with col1:
                 won_deals = deals_df[deals_df['deal_stage'] == 'Won']['deal_value'].sum()
                 st.metric("Won Deals Value", f"${won_deals:,.2f}")
             with col2:
                 pending_deals = deals_df[deals_df['deal_stage'].isin(['Proposal Sent', 'Negotiation'])]['deal_value'].sum()
                 st.metric("Pipeline Value", f"${pending_deals:,.2f}")
+            
+            # Show commission info only if user is authenticated
+            if st.session_state.get('settings_authenticated', False):
+                st.subheader("Admin View - Commission Details")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    total_commissions = deals_df['total_commissions'].sum()
+                    st.metric("Total Commissions", f"${total_commissions:,.2f}")
+                with col2:
+                    lead_gen_commissions = deals_df['commission_lead_gen'].sum()
+                    st.metric("Lead Gen Commissions", f"${lead_gen_commissions:,.2f}")
             with col3:
-                total_commissions = deals_df['total_commission'].sum()
-                st.metric("Total Commissions", f"${total_commissions:,.2f}")
+                    closer_commissions = deals_df['commission_closer'].sum()
+                    st.metric("Closer Commissions", f"${closer_commissions:,.2f}")
         else:
             st.info("No deals created yet.")
     
@@ -372,9 +394,9 @@ elif page == "Deals":
                     close_date = st.date_input("Expected Close Date")
                     payment_status = st.selectbox("Payment Status", ["Pending", "Paid", "Overdue"])
                 
-                # Show commission preview
-                if deal_value > 0:
-                    st.subheader("Commission Preview")
+                # Show commission preview only for authenticated users
+                if deal_value > 0 and st.session_state.get('settings_authenticated', False):
+                    st.subheader("Commission Preview (Admin View)")
                     commissions = calculate_commissions(deal_value)
                     col1, col2, col3, col4 = st.columns(4)
                     col1.metric("Lead Gen (8%)", f"${commissions['lead_gen']:,.2f}")
@@ -437,8 +459,8 @@ elif page == "Settings":
                 if username == "sabberreza" and password == "3Hthegame":
                     st.session_state.settings_authenticated = True
                     st.success("Authentication successful!")
-                    st.rerun()
-                else:
+                st.rerun()
+        else:
                     st.error("Invalid username or password. Please try again.")
         
         st.stop()
