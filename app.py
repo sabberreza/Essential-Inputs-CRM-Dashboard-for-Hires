@@ -316,17 +316,17 @@ elif page == "Team Members":
             submitted = st.form_submit_button("Add Team Member")
             
             if submitted and name:
-                    conn = sqlite3.connect('crm_database.db')
-                    cursor = conn.cursor()
-                    cursor.execute("""
+                conn = sqlite3.connect('crm_database.db')
+                cursor = conn.cursor()
+                cursor.execute("""
                     INSERT INTO team_members (name, role, email, phone, commission_percentage)
-                        VALUES (?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?)
                 """, (name, role, email, phone, commission_percentage))
-                    conn.commit()
-                    conn.close()
-                    
+                conn.commit()
+                conn.close()
+                
                 st.success(f"Team member '{name}' added successfully!")
-                    st.rerun()
+                st.rerun()
 
 elif page == "Deals":
     st.title("Deal Management")
@@ -459,8 +459,8 @@ elif page == "Settings":
                 if username == "sabberreza" and password == "3Hthegame":
                     st.session_state.settings_authenticated = True
                     st.success("Authentication successful!")
-                st.rerun()
-        else:
+                    st.rerun()
+                else:
                     st.error("Invalid username or password. Please try again.")
         
         st.stop()
